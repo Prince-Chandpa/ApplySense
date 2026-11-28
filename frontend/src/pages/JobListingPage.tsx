@@ -65,7 +65,7 @@ export const JobListingPage: React.FC<JobListingPageProps> = ({
         </div>
       </div>
 
-      {/* Experiment Group Notice Banner */}
+      {/* Experience Notice Banner */}
       <div className={`experiment-banner ${isTreatment ? 'treatment-banner' : 'control-banner'}`}>
         <div className="banner-icon">
           {isTreatment ? <Sparkles size={18} /> : <ShieldCheck size={18} />}
@@ -73,8 +73,8 @@ export const JobListingPage: React.FC<JobListingPageProps> = ({
         <div className="banner-content">
           <strong>
             {isTreatment
-              ? 'Treatment Experience Active: FitLens Smart Job Insights'
-              : 'Control Experience Active: Standard Job Details'}
+              ? 'Smart Insights Experience Active: FitLens Skill Insights'
+              : 'Standard Experience Active: Standard Job Details'}
           </strong>
           <p>
             {isTreatment

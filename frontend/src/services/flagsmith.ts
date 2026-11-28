@@ -22,7 +22,7 @@ export const getVisitorId = (): string => {
 
 /**
  * Resets visitor identity for demonstration / evaluation purposes.
- * Evaluators can use this to be re-allocated in the 50/50 experiment.
+ * A new identity may receive a different variation based on the Flagsmith configuration.
  */
 export const resetVisitorId = async (): Promise<string> => {
   const newId = `visitor_${crypto.randomUUID()}`;

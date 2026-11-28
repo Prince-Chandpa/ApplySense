@@ -182,7 +182,7 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <h1>Experiment Analytics Dashboard</h1>
           <p>
-            Shared cross-browser analytics evaluating whether FitLens Smart Job Insights improves application completion.
+            Shared cross-browser comparison of application completion across the recorded experiment variations.
           </p>
         </div>
 
@@ -478,7 +478,7 @@ export const AnalyticsPage: React.FC = () => {
               </div>
 
               <div className="allocation-pill">
-                50% Control / 50% Treatment Allocation
+                Allocation configured in Flagsmith
               </div>
             </div>
 
@@ -570,7 +570,7 @@ export const AnalyticsPage: React.FC = () => {
                     <li>✓ Dynamic FitLens skill-match percentage</li>
                     <li>✓ Matched skills vs missing skills breakdown</li>
                     <li>✓ Targeted profile improvement suggestions</li>
-                    <li>✓ High-confidence application call-to-action</li>
+                    <li>✓ Clear application call-to-action</li>
                   </ul>
                 </div>
               </div>
@@ -628,7 +628,7 @@ export const AnalyticsPage: React.FC = () => {
                 </div>
                 <div className="doc-item">
                   <span className="doc-label">Allocation:</span>
-                  <span>50% Control (standard) / 50% Treatment (smart_insights)</span>
+                  <span>Configured in Flagsmith; not verified by this dashboard</span>
                 </div>
                 <div className="doc-item">
                   <span className="doc-label">Current Visitor ID (This Browser):</span>

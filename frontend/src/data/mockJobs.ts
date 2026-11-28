@@ -106,12 +106,11 @@ export function calculateSkillFit(jobSkills: string[], candidateSkills: string[]
 
   let suggestion: string;
   if (missingSkills.length === 0) {
-    suggestion =
-      'Outstanding match! Your skill set aligns with 100% of the core requirements. Apply now with confidence to stand out to the hiring team.';
+    suggestion = 'All listed job skills match your profile.';
   } else if (missingSkills.length === 1) {
-    suggestion = `Strengthen your ${missingSkills[0]} knowledge and showcase a sample project in your portfolio to reach a perfect 100% profile match.`;
+    suggestion = `Build and document experience with ${missingSkills[0]} to address the remaining listed skill gap.`;
   } else {
-    suggestion = `To improve your candidacy, consider building projects demonstrating ${missingSkills.slice(0, 2).join(' and ')} before applying.`;
+    suggestion = `To address the listed gaps, consider building projects that demonstrate ${missingSkills.slice(0, 2).join(' and ')}.`;
   }
 
   return {

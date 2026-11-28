@@ -133,7 +133,7 @@ export const FitLensInsights: React.FC<FitLensInsightsProps> = ({
       {onApplyClick && (
         <div className="treatment-cta-row">
           <p className="cta-helper">
-            Candidates who review FitLens insights submit applications with 38% higher confidence.
+            FitLens compares the listed job skills with your profile and highlights matches and gaps.
           </p>
           <button
             type="button"

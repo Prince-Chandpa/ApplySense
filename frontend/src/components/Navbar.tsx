@@ -73,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
             type="button"
             className={`variation-pill ${isTreatment ? 'treatment-pill' : 'control-pill'}`}
             onClick={() => setShowIdentityModal(true)}
-            title="Click to view Flagsmith visitor identity details or re-allocate variation"
+            title="View this visitor identity and the displayed experience"
           >
             {isTreatment ? (
               <>
@@ -83,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
             ) : (
               <>
                 <span className="dot-indicator" />
-                <span>Control (Standard)</span>
+                <span>Standard Experience</span>
               </>
             )}
           </button>
@@ -104,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
         <div className="modal-backdrop" onClick={() => setShowIdentityModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Flagsmith Identity & Experiment Allocation</h3>
+              <h3>Visitor Identity & Flagsmith Experience</h3>
               <button
                 type="button"
                 className="modal-close"
@@ -120,9 +120,9 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
                 <code>smartapply_job_experience</code>
               </div>
               <div className="modal-item">
-                <span className="modal-label">Assigned Variation:</span>
+                <span className="modal-label">Displayed Experience:</span>
                 <span className={`status-tag ${isTreatment ? 'tag-treatment' : 'tag-control'}`}>
-                  {isTreatment ? 'smart_insights (Treatment Group)' : 'control (Control Group)'}
+                  {isTreatment ? 'Smart Insights' : 'Standard experience'}
                 </span>
               </div>
               <div className="modal-item">
@@ -130,15 +130,15 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
                 <code>{visitorId}</code>
               </div>
               <div className="modal-item">
-                <span className="modal-label">Allocation Strategy:</span>
-                <span>Flagsmith 50% Control / 50% Treatment based on Visitor ID hash</span>
+                <span className="modal-label">Assignment:</span>
+                <span>Managed by Flagsmith; allocation percentages are not verified here.</span>
               </div>
 
               <div className="modal-helper">
                 <HelpCircle size={16} />
                 <p>
-                  Flagsmith maintains consistent variation stickiness using this stable visitor identity.
-                  To test the other experiment bucket as a new candidate, you can reset your visitor ID.
+                  This visitor ID is passed to Flagsmith. Resetting it may produce a different
+                  variation, depending on the Flagsmith environment configuration.
                 </p>
               </div>
 
@@ -149,7 +149,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isTreatment, applicationCount = 
                   onClick={handleResetIdentity}
                 >
                   <RefreshCw size={14} />
-                  Reset Identity & Re-allocate (50/50)
+                  Reset Visitor Identity
                 </button>
                 <button
                   type="button"

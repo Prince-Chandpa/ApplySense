@@ -169,7 +169,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         </div>
       </div>
 
-      {/* Treatment Group: FitLens AI Analysis */}
+      {/* Treatment Group: FitLens Skill Insights */}
       {isTreatment && (
         <FitLensInsights
           jobSkills={job.skills}
