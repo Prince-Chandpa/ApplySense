@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useExperiment } from '@flagsmith/flagsmith/react';
-import { EXPERIMENT_FLAG, TREATMENT_VARIANT, getVisitorId } from './services/flagsmith';
-import { fetchSharedApplications } from './services/analyticsStorage';
+import {
+  EXPERIMENT_FLAG,
+  CONTROL_VARIANT,
+  TREATMENT_VARIANT,
+  getVisitorId,
+} from './services/flagsmith';
+import { fetchSharedApplications, recordSessionEvent } from './services/analyticsStorage';
 import type { ApplicationRecord } from './types/job';
 import { Navbar } from './components/Navbar';
 import { JobListingPage } from './pages/JobListingPage';
@@ -14,6 +19,16 @@ function App() {
   const experiment = useExperiment(EXPERIMENT_FLAG);
 
   const isTreatment = experiment?.variant === TREATMENT_VARIANT;
+
+  useEffect(() => {
+    const variant = experiment?.variant;
+    if (
+      experiment?.experiment?.inExperiment &&
+      (variant === CONTROL_VARIANT || variant === TREATMENT_VARIANT)
+    ) {
+      void recordSessionEvent('experiment_exposed', variant, 'JOB-001');
+    }
+  }, [experiment?.variant, experiment?.experiment?.inExperiment]);
 
   const [applicationCount, setApplicationCount] = useState<number>(() => {
     try {

@@ -1,5 +1,4 @@
 import flagsmith from '@flagsmith/flagsmith';
-import type { FlagsmithBackendResult } from '../types/analytics';
 
 export const EXPERIMENT_FLAG = 'smartapply_job_experience';
 export const CONTROL_VARIANT = 'control';
@@ -76,44 +75,6 @@ export const trackApplicationCompletedEvent = async (): Promise<boolean> => {
     console.error('Error tracking application_completed with Flagsmith:', error);
     return false;
   }
-};
-
-/**
- * Safely check if Flagsmith Experiment Results are available via a secure backend proxy.
- *
- * IMPORTANT SECURITY RULE:
- * Frontend NEVER queries Flagsmith Management API or data warehouse directly
- * because that requires private Admin API / Organization tokens.
- * This function calls an optional local/server proxy (/api/experiment-results)
- * if configured, or returns an honest 'waiting for data' state.
- */
-export const fetchFlagsmithExperimentResults = async (): Promise<FlagsmithBackendResult> => {
-  try {
-    const response = await fetch('/api/experiment-results', {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        ...data,
-        dataAvailable: true,
-      };
-    }
-  } catch {
-    // Expected when running frontend standalone without a backend proxy
-  }
-
-  // Safe fallback: Real state when direct warehouse results are unavailable or batch processing
-  return {
-    experimentId: 'ApplySense Smart Job Insights Experiment',
-    status: 'waiting_for_data',
-    primaryMetric: 'application_completed',
-    secondaryMetric: 'application_started',
-    dataAvailable: false,
-    message:
-      'Flagsmith Managed Warehouse is connected and actively ingesting events. Experiment results are computed asynchronously via the Flagsmith statistical engine. To query calculated Bayesian results securely, configure the minimal backend proxy with FLAGSMITH_ADMIN_API_KEY.',
-  };
 };
 
 export default flagsmith;

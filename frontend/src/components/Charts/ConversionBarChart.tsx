@@ -10,7 +10,9 @@ export const ConversionBarChart: React.FC<ConversionBarChartProps> = ({
   control,
   treatment,
 }) => {
-  const maxRate = Math.max(control.completionRate, treatment.completionRate, 60);
+  const controlRate = control.completionRate ?? 0;
+  const treatmentRate = treatment.completionRate ?? 0;
+  const maxRate = Math.max(controlRate, treatmentRate, 60);
   const chartHeight = 220;
   const chartWidth = 480;
   const barWidth = 70;
@@ -18,9 +20,9 @@ export const ConversionBarChart: React.FC<ConversionBarChartProps> = ({
   const usableHeight = 140;
 
   const controlBarHeight =
-    maxRate > 0 ? (control.completionRate / maxRate) * usableHeight : 0;
+    maxRate > 0 ? (controlRate / maxRate) * usableHeight : 0;
   const treatmentBarHeight =
-    maxRate > 0 ? (treatment.completionRate / maxRate) * usableHeight : 0;
+    maxRate > 0 ? (treatmentRate / maxRate) * usableHeight : 0;
 
   const controlY = baseY - controlBarHeight;
   const treatmentY = baseY - treatmentBarHeight;
@@ -108,7 +110,7 @@ export const ConversionBarChart: React.FC<ConversionBarChartProps> = ({
             fontWeight="700"
             fill="#475569"
           >
-            {control.completionRate}%
+            {control.completionRate === null ? 'N/A' : `${control.completionRate}%`}
           </text>
           <text
             x={110 + barWidth / 2}
@@ -150,7 +152,7 @@ export const ConversionBarChart: React.FC<ConversionBarChartProps> = ({
             fontWeight="700"
             fill="#635bdb"
           >
-            {treatment.completionRate}%
+            {treatment.completionRate === null ? 'N/A' : `${treatment.completionRate}%`}
           </text>
           <text
             x={290 + barWidth / 2}

@@ -1,4 +1,7 @@
-export type EventType = 'application_started' | 'application_completed';
+export type EventType =
+  | 'experiment_exposed'
+  | 'application_started'
+  | 'application_completed';
 
 export interface TelemetryEvent {
   id: string;
@@ -16,7 +19,8 @@ export interface VariantStats {
   uniqueUsersExposed: number;
   starts: number;
   completions: number;
-  completionRate: number; // percentage (0-100)
+  startRate: number | null;
+  completionRate: number | null;
 }
 
 export interface ExperimentSummary {
@@ -24,37 +28,32 @@ export interface ExperimentSummary {
   treatment: VariantStats;
   totalStarts: number;
   totalCompletions: number;
-  overallRate: number;
-  absoluteDifference: number; // treatmentRate - controlRate
-  relativeLift: number | null; // percentage lift, or null if invalid
-  isStatisticallySignificant: boolean;
-  pValue: number | null;
-  confidenceInterval: [number, number] | null;
-  sampleSizeSufficient: boolean;
-  notes: string[];
+  overallRate: number | null;
+  absoluteDifference: number | null;
 }
 
-export interface FlagsmithBackendResult {
-  experimentId: string;
-  status: 'active' | 'completed' | 'waiting_for_data';
-  primaryMetric: string;
-  secondaryMetric: string;
-  controlConversions?: number;
-  controlVisitors?: number;
-  treatmentConversions?: number;
-  treatmentVisitors?: number;
-  winner?: string;
-  probabilityOfBest?: {
-    control: number;
-    treatment: number;
-  };
-  lastUpdated?: string;
-  dataAvailable: boolean;
-  message?: string;
+export interface ExperimentVariantPerformance {
+  visitors: number;
+  applicationsStarted: number;
+  applicationsCompleted: number;
+  startRate: number | null;
+  conversionRate: number | null;
+}
+
+export interface ExperimentPerformance {
+  name: string;
+  source: 'shared_backend_telemetry';
+  status: 'no_data' | 'collecting_data';
+  control: ExperimentVariantPerformance;
+  smart_insights: ExperimentVariantPerformance;
+  conversionDifference: number | null;
+  lastUpdated: string;
 }
 
 export interface SharedAnalyticsResponse {
   summary: ExperimentSummary;
+  experiment: ExperimentPerformance | null;
+  experimentError?: string;
   events: TelemetryEvent[];
   totalEventsCount: number;
   lastSyncedAt: string;

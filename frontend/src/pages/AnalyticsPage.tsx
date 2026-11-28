@@ -5,11 +5,9 @@ import {
   Users,
   Target,
   Sparkles,
-  CheckCircle2,
   Info,
   RefreshCw,
   Database,
-  Lock,
   PlayCircle,
   RotateCcw,
   Clock,
@@ -24,22 +22,22 @@ import {
   simulateSharedCohort,
   clearSharedSessionData,
 } from '../services/analyticsStorage';
-import {
-  fetchFlagsmithExperimentResults,
-  getVisitorId,
-} from '../services/flagsmith';
+import { getVisitorId } from '../services/flagsmith';
 import type {
   ExperimentSummary,
+  ExperimentPerformance,
   TelemetryEvent,
-  FlagsmithBackendResult,
 } from '../types/analytics';
 import { ConversionBarChart } from '../components/Charts/ConversionBarChart';
 import { FunnelChart } from '../components/Charts/FunnelChart';
+import { calculateExperimentPerformance } from '../services/experimentAnalytics';
 
 export const AnalyticsPage: React.FC = () => {
   const [activeDataSource, setActiveDataSource] = useState<'shared' | 'local'>('shared');
   const [activeTab, setActiveTab] = useState<'experiment' | 'warehouse' | 'events'>('experiment');
-  const [eventFilter, setEventFilter] = useState<'all' | 'application_started' | 'application_completed'>('all');
+  const [eventFilter, setEventFilter] = useState<
+    'all' | 'experiment_exposed' | 'application_started' | 'application_completed'
+  >('all');
 
   // Shared backend state
   const [sharedSummary, setSharedSummary] = useState<ExperimentSummary>(() => calculateExperimentStats([]));
@@ -47,16 +45,15 @@ export const AnalyticsPage: React.FC = () => {
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [dataSourceType, setDataSourceType] = useState<'shared_backend' | 'local_fallback'>('shared_backend');
+  const [sharedPerformance, setSharedPerformance] = useState<ExperimentPerformance | null>(null);
+  const [experimentError, setExperimentError] = useState<string | null>(null);
+  const [isLoadingExperiment, setIsLoadingExperiment] = useState(true);
 
   // Local browser session state
   const [localEvents, setLocalEvents] = useState<TelemetryEvent[]>(() => getStoredEvents());
   const [localSummary, setLocalSummary] = useState<ExperimentSummary>(() =>
     calculateExperimentStats(getStoredEvents())
   );
-
-  // Flagsmith Warehouse management result
-  const [backendResult, setBackendResult] = useState<FlagsmithBackendResult | null>(null);
-  const [isLoadingBackend, setIsLoadingBackend] = useState<boolean>(true);
 
   const visitorId = getVisitorId();
 
@@ -69,6 +66,9 @@ export const AnalyticsPage: React.FC = () => {
       setSharedEvents(res.events);
       setLastSyncedAt(res.lastSyncedAt);
       setDataSourceType(res.source);
+      setSharedPerformance(res.experiment);
+      setExperimentError(res.experimentError || null);
+      setIsLoadingExperiment(false);
 
       const local = getStoredEvents();
       setLocalEvents(local);
@@ -88,6 +88,9 @@ export const AnalyticsPage: React.FC = () => {
         setSharedEvents(res.events);
         setLastSyncedAt(res.lastSyncedAt);
         setDataSourceType(res.source);
+        setSharedPerformance(res.experiment);
+        setExperimentError(res.experimentError || null);
+        setIsLoadingExperiment(false);
       }
     });
 
@@ -98,6 +101,9 @@ export const AnalyticsPage: React.FC = () => {
           setSharedEvents(res.events);
           setLastSyncedAt(res.lastSyncedAt);
           setDataSourceType(res.source);
+          setSharedPerformance(res.experiment);
+          setExperimentError(res.experimentError || null);
+          setIsLoadingExperiment(false);
         }
       });
     }, 12000);
@@ -108,34 +114,6 @@ export const AnalyticsPage: React.FC = () => {
     };
   }, []);
 
-  // Check Flagsmith Management API experiment results
-  useEffect(() => {
-    let isMounted = true;
-    fetchFlagsmithExperimentResults()
-      .then(res => {
-        if (isMounted) setBackendResult(res);
-      })
-      .catch(() => {
-        if (isMounted) {
-          setBackendResult({
-            experimentId: 'ApplySense Smart Job Insights Experiment',
-            status: 'waiting_for_data',
-            primaryMetric: 'application_completed',
-            secondaryMetric: 'application_started',
-            dataAvailable: false,
-            message: 'Flagsmith Managed Warehouse results awaiting batch computation.',
-          });
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingBackend(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   const handleSimulateCohort = async () => {
     setIsRefreshing(true);
     try {
@@ -143,6 +121,14 @@ export const AnalyticsPage: React.FC = () => {
       setSharedSummary(res.summary);
       setSharedEvents(res.events);
       setLastSyncedAt(res.lastSyncedAt);
+      setDataSourceType(res.source);
+      setSharedPerformance(res.experiment);
+      setExperimentError(res.experimentError || null);
+      if (res.source === 'local_fallback') {
+        setActiveDataSource('local');
+        setLocalEvents(res.events);
+        setLocalSummary(res.summary);
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -164,6 +150,11 @@ export const AnalyticsPage: React.FC = () => {
   const isViewingLocal = activeDataSource === 'local';
   const displayedSummary = isViewingLocal ? localSummary : sharedSummary;
   const displayedEvents = isViewingLocal ? localEvents : sharedEvents;
+  const displayedPerformance = isViewingLocal
+    ? calculateExperimentPerformance(localEvents)
+    : sharedPerformance;
+  const hasExperimentData = displayedPerformance?.status === 'collecting_data';
+  const conversionDifference = displayedPerformance?.conversionDifference ?? null;
 
   const isCohortSimulated = displayedEvents.some(e => e.metadata?.simulated);
 
@@ -174,10 +165,10 @@ export const AnalyticsPage: React.FC = () => {
 
   const formattedLastSync = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
     : 'Syncing...';
 
   return (
@@ -229,7 +220,7 @@ export const AnalyticsPage: React.FC = () => {
               type="button"
               className="action-btn primary-btn"
               onClick={handleSimulateCohort}
-              title="Populates 100 benchmark users across all browsers to evaluate statistical charts at scale"
+              title="Populates 100 simulated visitors and application events across all browsers"
             >
               <PlayCircle size={14} />
               Simulate 100 Users
@@ -277,9 +268,8 @@ export const AnalyticsPage: React.FC = () => {
         <div className="simulated-alert-banner">
           <Info size={18} />
           <div>
-            <strong>Benchmark Demonstration Cohort Loaded:</strong> 100 candidate trials
-            (50 Control / 50 Treatment) are loaded into the shared backend to visualize high-volume charts, lift calculations, and
-            two-proportion statistical significance. Real events recorded in Browser A or B are merged.
+            <strong>Benchmark Demonstration Cohort Loaded:</strong> 100 simulated visitors
+            (50 Control / 50 Treatment) are loaded into shared telemetry to illustrate counts and conversion rates.
           </div>
           <button
             type="button"
@@ -299,7 +289,7 @@ export const AnalyticsPage: React.FC = () => {
           onClick={() => setActiveTab('experiment')}
         >
           <TrendingUp size={15} />
-          Experiment Results & Lift
+          Experiment Performance
         </button>
 
         <button
@@ -308,7 +298,7 @@ export const AnalyticsPage: React.FC = () => {
           onClick={() => setActiveTab('warehouse')}
         >
           <Database size={15} />
-          Flagsmith Warehouse & API
+          Shared Backend Telemetry
           <span className="live-dot" />
         </button>
 
@@ -322,9 +312,88 @@ export const AnalyticsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: EXPERIMENT RESULTS & LIFT */}
+      {/* TAB 1: EXPERIMENT PERFORMANCE */}
       {activeTab === 'experiment' && (
         <>
+          {!isViewingLocal && isLoadingExperiment ? (
+            <div className="loading-state">
+              <RefreshCw size={20} className="spinning" />
+              <span>Loading shared experiment metrics...</span>
+            </div>
+          ) : !isViewingLocal && experimentError ? (
+            <div className="waiting-state-card" role="alert">
+              <strong>Shared analytics unavailable</strong>
+              <p className="waiting-explanation">{experimentError}</p>
+            </div>
+          ) : !hasExperimentData || !displayedPerformance ? (
+            <div className="waiting-state-card">
+              <strong>No experiment exposure data yet</strong>
+              <p className="waiting-explanation">
+                Experiment performance appears after visitors receive a recorded variation.
+              </p>
+              {displayedPerformance && (
+                <p>Last updated: {new Date(displayedPerformance.lastUpdated).toLocaleString()}</p>
+              )}
+            </div>
+          ) : (
+            <div className="api-result-box">
+              <div className="api-box-header">
+                <h4>ApplySense Experiment Performance</h4>
+                <span className="api-timestamp">
+                  <Database size={13} /> Data source:{' '}
+                  {isViewingLocal || dataSourceType === 'local_fallback'
+                    ? 'This Browser'
+                    : 'ApplySense Shared Backend'}
+                </span>
+              </div>
+              <div className="waiting-icon-row">
+                <Clock size={16} className="waiting-icon" />
+                <strong>Data collection in progress</strong>
+                <span>Last updated: {new Date(displayedPerformance.lastUpdated).toLocaleString()}</span>
+              </div>
+              <div className="warehouse-details-grid">
+                <div>Control visitors: <strong>{displayedPerformance.control.visitors}</strong></div>
+                <div>Smart Insights visitors: <strong>{displayedPerformance.smart_insights.visitors}</strong></div>
+                <div>Control completed applications: <strong>{displayedPerformance.control.applicationsCompleted}</strong></div>
+                <div>Smart Insights completed applications: <strong>{displayedPerformance.smart_insights.applicationsCompleted}</strong></div>
+                <div>
+                  Control conversion rate:{' '}
+                  <strong>
+                    {displayedPerformance.control.conversionRate === null
+                      ? 'Not available'
+                      : `${displayedPerformance.control.conversionRate.toFixed(2)}%`}
+                  </strong>
+                </div>
+                <div>
+                  Smart Insights conversion rate:{' '}
+                  <strong>
+                    {displayedPerformance.smart_insights.conversionRate === null
+                      ? 'Not available'
+                      : `${displayedPerformance.smart_insights.conversionRate.toFixed(2)}%`}
+                  </strong>
+                </div>
+                <div>
+                  Conversion rate difference:{' '}
+                  <strong>
+                    {displayedPerformance.conversionDifference === null
+                      ? 'Not available'
+                      : `${displayedPerformance.conversionDifference > 0 ? '+' : ''}${displayedPerformance.conversionDifference.toFixed(2)} percentage points`}
+                  </strong>
+                </div>
+                <div>Control application starts: <strong>{displayedPerformance.control.applicationsStarted}</strong></div>
+                <div>Smart Insights application starts: <strong>{displayedPerformance.smart_insights.applicationsStarted}</strong></div>
+              </div>
+              {(displayedPerformance.control.visitors < 50 ||
+                displayedPerformance.smart_insights.visitors < 50) && (
+                <p className="waiting-explanation">
+                  Early data — collect more visitors before drawing conclusions.
+                </p>
+              )}
+            </div>
+          )}
+
+          {hasExperimentData && (
+            <>
           {/* Section 1: Overview Summary Cards */}
           <div className="metric-cards-grid">
             <div className="metric-card">
@@ -334,7 +403,7 @@ export const AnalyticsPage: React.FC = () => {
               <div className="metric-content">
                 <span className="metric-label">Application Starts (Auxiliary)</span>
                 <strong className="metric-value">{displayedSummary.totalStarts}</strong>
-                <span className="metric-hint">Unique visitors opening apply form</span>
+                <span className="metric-hint">Distinct application_started events</span>
               </div>
             </div>
 
@@ -343,9 +412,9 @@ export const AnalyticsPage: React.FC = () => {
                 <Target size={20} className="completions-color" />
               </div>
               <div className="metric-content">
-                <span className="metric-label">Application Completions (Primary)</span>
+                <span className="metric-label">Visitors with Completed Applications</span>
                 <strong className="metric-value">{displayedSummary.totalCompletions}</strong>
-                <span className="metric-hint">Validated & saved applications</span>
+                <span className="metric-hint">Unique exposed visitors with a completion</span>
               </div>
             </div>
 
@@ -355,36 +424,44 @@ export const AnalyticsPage: React.FC = () => {
               </div>
               <div className="metric-content">
                 <span className="metric-label">Overall Conversion Rate</span>
-                <strong className="metric-value">{displayedSummary.overallRate}%</strong>
-                <span className="metric-hint">Completions / Unique Starts</span>
+                <strong className="metric-value">
+                  {displayedSummary.overallRate === null
+                    ? 'Not available'
+                    : `${displayedSummary.overallRate.toFixed(2)}%`}
+                </strong>
+                <span className="metric-hint">Unique completions / Exposed visitors</span>
               </div>
             </div>
 
             <div className="metric-card">
               <div
-                className={`metric-icon-wrap ${
-                  displayedSummary.absoluteDifference >= 0 ? 'lift-pos-bg' : 'lift-neg-bg'
-                }`}
+                className={`metric-icon-wrap ${conversionDifference !== null && conversionDifference >= 0
+                  ? 'lift-pos-bg'
+                  : 'lift-neg-bg'
+                  }`}
               >
                 <Sparkles
                   size={20}
-                  className={displayedSummary.absoluteDifference >= 0 ? 'lift-pos-color' : 'lift-neg-color'}
+                  className={
+                    conversionDifference !== null && conversionDifference >= 0
+                      ? 'lift-pos-color'
+                      : 'lift-neg-color'
+                  }
                 />
               </div>
               <div className="metric-content">
-                <span className="metric-label">Treatment Lift</span>
+                <span className="metric-label">Conversion Rate Difference</span>
                 <strong
-                  className={`metric-value ${
-                    displayedSummary.absoluteDifference >= 0 ? 'lift-pos-text' : 'lift-neg-text'
-                  }`}
+                  className={`metric-value ${conversionDifference !== null && conversionDifference >= 0
+                    ? 'lift-pos-text'
+                    : 'lift-neg-text'
+                    }`}
                 >
-                  {displayedSummary.absoluteDifference > 0 ? `+${displayedSummary.absoluteDifference}%` : `${displayedSummary.absoluteDifference}%`}
+                  {conversionDifference === null
+                    ? 'Not available'
+                    : `${conversionDifference > 0 ? '+' : ''}${conversionDifference.toFixed(2)} pp`}
                 </strong>
-                <span className="metric-hint">
-                  {displayedSummary.relativeLift !== null && displayedSummary.sampleSizeSufficient
-                    ? `Relative: +${displayedSummary.relativeLift}%`
-                    : 'Awaiting sufficient N (≥30)'}
-                </span>
+                <span className="metric-hint">Treatment rate minus control rate</span>
               </div>
             </div>
           </div>
@@ -417,17 +494,21 @@ export const AnalyticsPage: React.FC = () => {
                 </div>
 
                 <div className="conversion-display">
-                  <span className="big-rate">{displayedSummary.control.completionRate}%</span>
+                  <span className="big-rate">
+                    {displayedSummary.control.completionRate === null
+                      ? 'Not available'
+                      : `${displayedSummary.control.completionRate.toFixed(2)}%`}
+                  </span>
                   <span className="rate-subtext">Conversion Rate</span>
                 </div>
 
                 <div className="variant-stats-list">
                   <div className="v-stat-row">
-                    <span>Unique Exposed Visitors (Starts):</span>
+                    <span>Unique Exposed Visitors:</span>
                     <strong>{displayedSummary.control.uniqueUsersExposed}</strong>
                   </div>
                   <div className="v-stat-row">
-                    <span>Completed Applications:</span>
+                    <span>Visitors with Completed Applications:</span>
                     <strong>{displayedSummary.control.completions}</strong>
                   </div>
                   <div className="v-stat-row">
@@ -459,17 +540,21 @@ export const AnalyticsPage: React.FC = () => {
                 </div>
 
                 <div className="conversion-display">
-                  <span className="big-rate treat-rate">{displayedSummary.treatment.completionRate}%</span>
+                  <span className="big-rate treat-rate">
+                    {displayedSummary.treatment.completionRate === null
+                      ? 'Not available'
+                      : `${displayedSummary.treatment.completionRate.toFixed(2)}%`}
+                  </span>
                   <span className="rate-subtext">Conversion Rate</span>
                 </div>
 
                 <div className="variant-stats-list">
                   <div className="v-stat-row">
-                    <span>Unique Exposed Visitors (Starts):</span>
+                    <span>Unique Exposed Visitors:</span>
                     <strong>{displayedSummary.treatment.uniqueUsersExposed}</strong>
                   </div>
                   <div className="v-stat-row">
-                    <span>Completed Applications:</span>
+                    <span>Visitors with Completed Applications:</span>
                     <strong>{displayedSummary.treatment.completions}</strong>
                   </div>
                   <div className="v-stat-row">
@@ -491,73 +576,6 @@ export const AnalyticsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Statistical Lift & Rigor Card */}
-            <div className="statistical-rigor-card">
-              <div className="rigor-header">
-                <h4>Statistical Rigor & Lift Analysis</h4>
-                <span className="rigor-tag">Data Integrity Protected</span>
-              </div>
-
-              <div className="rigor-grid">
-                <div className="rigor-item">
-                  <span className="rigor-label">Absolute Difference:</span>
-                  <strong>
-                    {displayedSummary.absoluteDifference > 0
-                      ? `+${displayedSummary.absoluteDifference}%`
-                      : `${displayedSummary.absoluteDifference}%`}
-                  </strong>
-                  <span className="rigor-desc">Treatment Rate - Control Rate</span>
-                </div>
-
-                <div className="rigor-item">
-                  <span className="rigor-label">Relative Lift:</span>
-                  <strong>
-                    {displayedSummary.relativeLift !== null && displayedSummary.control.completionRate > 0
-                      ? `${displayedSummary.relativeLift > 0 ? '+' : ''}${displayedSummary.relativeLift}%`
-                      : 'N/A (Control = 0%)'}
-                  </strong>
-                  <span className="rigor-desc">(Treatment - Control) / Control</span>
-                </div>
-
-                <div className="rigor-item">
-                  <span className="rigor-label">Two-Proportion Z-Test (p-value):</span>
-                  <strong>
-                    {displayedSummary.pValue !== null ? `p = ${displayedSummary.pValue}` : 'Insufficient Data'}
-                  </strong>
-                  <span className="rigor-desc">Significance threshold: p &lt; 0.05</span>
-                </div>
-
-                <div className="rigor-item">
-                  <span className="rigor-label">Statistical Significance:</span>
-                  <span
-                    className={`sig-pill ${
-                      displayedSummary.isStatisticallySignificant ? 'sig-yes' : 'sig-no'
-                    }`}
-                  >
-                    {displayedSummary.isStatisticallySignificant
-                      ? '✓ Statistically Significant (p < 0.05)'
-                      : displayedSummary.sampleSizeSufficient
-                      ? 'Not Significant Yet'
-                      : 'Sample Size Too Small'}
-                  </span>
-                  <span className="rigor-desc">
-                    {displayedSummary.sampleSizeSufficient
-                      ? `N = ${displayedSummary.totalStarts} (Sufficient sample)`
-                      : `N = ${displayedSummary.totalStarts}/30 required minimum`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Data Integrity Callout */}
-              <div className="integrity-notes">
-                {displayedSummary.notes.map((note, idx) => (
-                  <p key={idx}>
-                    <Info size={14} className="note-icon" />
-                    {note}
-                  </p>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Section 3: Visual Charts */}
@@ -619,136 +637,29 @@ export const AnalyticsPage: React.FC = () => {
               </div>
             </div>
           </div>
+            </>
+          )}
         </>
       )}
 
-      {/* TAB 2: FLAGSMITH WAREHOUSE & SECURE API */}
+      {/* TAB 2: SHARED BACKEND TELEMETRY */}
       {activeTab === 'warehouse' && (
         <div className="warehouse-tab-content">
-          <div className="warehouse-status-card">
-            <div className="warehouse-top">
-              <div className="warehouse-icon-title">
-                <Database size={24} className="warehouse-icon" />
-                <div>
-                  <h3>Flagsmith Managed Warehouse Integration</h3>
-                  <p>Real-time event streaming and Bayesian statistics engine</p>
-                </div>
-              </div>
-
-              <div className="status-indicator-live">
-                <span className="pulsing-dot" />
-                <span>Streaming Events Active</span>
-              </div>
+          <div className="security-architecture-card">
+            <div className="sec-header">
+              <Database size={18} className="lock-icon" />
+              <h4>Shared Analytics Data Source</h4>
             </div>
-
-            <div className="warehouse-details-grid">
-              <div className="detail-box">
-                <span className="detail-title">Flagsmith Project</span>
-                <strong>ApplySense</strong>
-              </div>
-              <div className="detail-box">
-                <span className="detail-title">Environment</span>
-                <strong>Development</strong>
-              </div>
-              <div className="detail-box">
-                <span className="detail-title">Environment Client Key</span>
-                <code>*......*** (Masked)</code>
-              </div>
-              <div className="detail-box">
-                <span className="detail-title">Data Warehouse Connection</span>
-                <span className="badge-connected">✓ Connected (Managed ClickHouse/Snowflake)</span>
-              </div>
-            </div>
-
-            {/* Live API Results Box */}
-            {/* <div className="api-result-box">
-              <div className="api-box-header">
-                <h4>Flagsmith Experiment Results Status</h4>
-                <span className="api-timestamp">
-                  <Clock size={13} /> Asynchronous Engine
-                </span>
-              </div>
-
-              {isLoadingBackend ? (
-                <div className="loading-state">
-                  <RefreshCw size={20} className="spinning" />
-                  <span>Checking Flagsmith experiment results endpoint...</span>
-                </div>
-              ) : backendResult?.dataAvailable ? (
-                <div className="backend-success">
-                  <p>Live calculated Bayesian results loaded successfully from Flagsmith Management API.</p>
-                  <div className="flagsmith-results-grid">
-                    <div>Winner: <strong>{backendResult.winner || 'Pending evaluation'}</strong></div>
-                    <div>Control Visitors: <strong>{backendResult.controlVisitors || 0}</strong></div>
-                    <div>Control Conversions: <strong>{backendResult.controlConversions || 0}</strong></div>
-                    <div>Treatment Visitors: <strong>{backendResult.treatmentVisitors || 0}</strong></div>
-                    <div>Treatment Conversions: <strong>{backendResult.treatmentConversions || 0}</strong></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="waiting-state-card">
-                  <div className="waiting-icon-row">
-                    <Clock size={20} className="waiting-icon" />
-                    <strong>Status: Waiting for experiment data / Batch computation</strong>
-                  </div>
-                  <p className="waiting-explanation">
-                    {backendResult?.message ||
-                      'Flagsmith Managed Warehouse is connected and actively collecting application_started and application_completed events. Raw events are aggregated asynchronously into Bayesian distributions.'}
-                  </p>
-                  <div className="waiting-checklist">
-                    <div className="check-item">
-                      <CheckCircle2 size={15} className="check-ok" />
-                      <span>Flagsmith SDK initialized with stable visitor identity</span>
-                    </div>
-                    <div className="check-item">
-                      <CheckCircle2 size={15} className="check-ok" />
-                      <span>Custom events enabled and tracked with automatic batching</span>
-                    </div>
-                    <div className="check-item">
-                      <CheckCircle2 size={15} className="check-ok" />
-                      <span>Flagsmith Managed Warehouse configured in project settings</span>
-                    </div>
-                    <div className="check-item">
-                      <Clock size={15} className="check-wait" />
-                      <span>Bayesian statistical computation interval (Flagsmith asynchronous cron)</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div> */}
-
-            {/* Architecture Explanation Card */}
-            <div className="security-architecture-card">
-              <div className="sec-header">
-                <Lock size={18} className="lock-icon" />
-                <h4>Security & Backend Architecture (Data Integrity Rule)</h4>
-              </div>
-
-              <div className="sec-content">
-                <p>
-                  Per the hackathon guidelines and enterprise security best practices:
-                  <strong>
-                    {' '}Browser clients must NEVER directly query the Flagsmith Management API or Managed Warehouse.
-                  </strong>
-                </p>
-                <ul>
-                  <li>
-                    <strong>Why?</strong> Flagsmith Management API endpoints (such as{' '}
-                    <code>/api/v1/environments/{'{env_key}'}/experiments/{'{exp_id}'}/results/</code>) require
-                    an administrative <code>Authorization: Api-Key</code> with organization-level read privileges.
-                    Exposing an Admin API Key in frontend <code>VITE_*</code> variables would allow anyone to
-                    read/modify all feature flags.
-                  </li>
-                  <li>
-                    <strong>Implemented Minimal Secure Backend:</strong> A secure Node.js proxy middleware in the backend stores the private <code>FLAGSMITH_ADMIN_API_KEY</code> on the server,
-                    queries Flagsmith Management API with server-side caching (5-minute TTL per Flagsmith rate limits),
-                    and exposes a safe public endpoint (<code>/api/experiment-results</code>) without credentials.
-                  </li>
-                  <li>
-                    <strong>Shared Cross-Browser Synchronization:</strong> Real-time shared telemetry is persisted across all browsers via <code>/api/telemetry/*</code>, while Flagsmith data warehouse events stream in parallel.
-                  </li>
-                </ul>
-              </div>
+            <div className="sec-content">
+              <p>
+                Experiment performance is calculated from telemetry persisted by the ApplySense backend.
+                Flagsmith remains responsible for feature-flag evaluation and variation assignment.
+              </p>
+              <ul>
+                <li>Exposure events record each visitor's assigned variation.</li>
+                <li>Application starts and completions are matched to the same visitor and variation.</li>
+                <li>Analytics are shared across browsers through <code>/api/telemetry/analytics</code>.</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -763,7 +674,7 @@ export const AnalyticsPage: React.FC = () => {
                 {isViewingLocal ? "This Browser's Event Log" : 'Shared Event Telemetry Stream (All Browsers)'}
               </h3>
               <p>
-                Events recorded across candidate sessions and flushed to Flagsmith Managed Warehouse.
+                Events recorded by the Flagsmith SDK and mirrored to shared ApplySense telemetry.
               </p>
             </div>
 
@@ -775,6 +686,13 @@ export const AnalyticsPage: React.FC = () => {
                 onClick={() => setEventFilter('all')}
               >
                 All ({displayedEvents.length})
+              </button>
+              <button
+                type="button"
+                className={`filter-btn ${eventFilter === 'experiment_exposed' ? 'active' : ''}`}
+                onClick={() => setEventFilter('experiment_exposed')}
+              >
+                Exposures ({displayedEvents.filter(e => e.eventType === 'experiment_exposed').length})
               </button>
               <button
                 type="button"
@@ -798,9 +716,9 @@ export const AnalyticsPage: React.FC = () => {
               <FileSpreadsheet size={36} className="empty-icon" />
               <h4>No telemetry events recorded yet</h4>
               <p>
-                Visit the <strong>Explore Jobs</strong> tab and click "Apply for this job" to generate an{' '}
-                <code>application_started</code> event, or submit the application to generate an{' '}
-                <code>application_completed</code> event.
+                Visit the <strong>Explore Jobs</strong> tab to record an exposure, click "Apply for this job"
+                to generate an <code>application_started</code> event, or submit the application to generate
+                an <code>application_completed</code> event.
               </p>
             </div>
           ) : (
@@ -832,22 +750,22 @@ export const AnalyticsPage: React.FC = () => {
                         <td className="time-col">{formattedTime}</td>
                         <td>
                           <span
-                            className={`event-badge ${
-                              evt.eventType === 'application_completed'
+                            className={`event-badge ${evt.eventType === 'application_completed'
                                 ? 'evt-completed'
-                                : 'evt-started'
-                            }`}
+                                : evt.eventType === 'application_started'
+                                  ? 'evt-started'
+                                  : 'evt-started'
+                              }`}
                           >
                             {evt.eventType}
                           </span>
                         </td>
                         <td>
                           <span
-                            className={`var-badge ${
-                              evt.variation === 'smart_insights'
+                            className={`var-badge ${evt.variation === 'smart_insights'
                                 ? 'var-treatment'
                                 : 'var-control'
-                            }`}
+                              }`}
                           >
                             {evt.variation === 'smart_insights' ? 'Treatment' : 'Control'}
                           </span>

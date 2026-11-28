@@ -48,31 +48,24 @@ A dedicated SaaS analytics dashboard with high data integrity:
 
 1. **Overview KPI Cards:**
    * Total Application Starts (Auxiliary)
-   * Total Application Completions (Primary)
+   * Unique Visitors with Completed Applications (Primary)
    * Overall Conversion Rate
-   * Treatment Lift vs Control
+   * Treatment-Control Conversion Rate Difference
 2. **Side-by-Side Variation Comparison:**
    * Conversion rate comparison (Primary Metric)
-   * Denominator integrity: Unique exposed visitors who started an application
+   * Denominator integrity: Unique visitors with a recorded experiment exposure
    * Numerator integrity: Unique candidates who successfully completed the application
    * Feature comparison table
-3. **Statistical Rigor & Lift Analysis:**
-   * Absolute difference ($Rate_{Treatment} - Rate_{Control}$)
-   * Relative lift ($((Rate_{Treatment} - Rate_{Control}) / Rate_{Control}) \times 100\%$)
-   * Two-proportion Z-test p-value calculation
-   * Sample size guardrail ($N \ge 30$) preventing misleading claims when sample size is insufficient
-4. **Interactive SVG Visualizations:**
+3. **Interactive SVG Visualizations:**
    * Conversion Rate Bar Chart (Control vs Treatment)
    * Starts vs Completions Funnel Chart
-5. **Flagsmith Managed Warehouse Status & API Panel:**
-   * Environment Key status (masked)
-   * Real-time streaming status
-   * Bayesian engine calculation status (*"Waiting for experiment data / batch computation"*)
-   * Minimal secure backend architecture explanation
-6. **Telemetry Event Stream:**
-   * Live, filterable event table for `application_started` and `application_completed` with timestamps, variations, and visitor identifiers.
-7. **Demonstration Controls:**
-   * **Simulate 100-User Cohort:** Populates a benchmark dataset (50 Control / 50 Treatment) with clear visual labeling, enabling judges to test chart visualizations and significance models at scale.
+4. **Shared Backend Experiment Performance:**
+   * Control and Smart Insights exposures, starts, completions, and conversion rates.
+   * Conversion-rate difference, data source, last update time, and early-data messaging.
+5. **Telemetry Event Stream:**
+   * Live, filterable shared event table for experiment exposures, `application_started`, and `application_completed`.
+6. **Demonstration Controls:**
+   * **Simulate 100-User Cohort:** Populates a clearly labeled benchmark dataset (50 Control / 50 Treatment) to illustrate event counts and rates.
    * **Reset Session Data:** Clears local session telemetry back to a clean state at any time.
 
 ---
@@ -85,14 +78,12 @@ A dedicated SaaS analytics dashboard with high data integrity:
    * When Browser B (Visitor B, with an independent Flagsmith visitor identity) opens the `/analytics` dashboard, the dashboard automatically synchronizes with the shared backend.
    * The dashboard includes automatic polling every 12 seconds, an on-demand manual refresh button, and displays the exact timestamp of the last successful synchronization.
 2. **Clear Distinction of Data Scopes:**
-   * **Flagsmith Experiment Results (Data Warehouse):** Official Bayesian computation from Flagsmith (with waiting-for-data state when pending).
-   * **Shared Global Telemetry (All Browsers):** Real-time aggregated results from all candidate browsers and sessions connected to the backend.
+   * **Flagsmith SDK:** Evaluates the feature flag and assigns each visitor a variation.
+   * **Shared Global Telemetry (All Browsers):** Experiment metrics are calculated from exposure and application events persisted by the backend.
    * **Local Browser Session Telemetry:** Explicitly inspects only the active tab's visitor actions (`visitor_...`).
 3. **No Frontend Secret Exposure:**
    Browser clients only communicate with Flagsmith using the public Client-side Environment API Key (`VITE_FLAGSMITH_ENVIRONMENT_KEY`). Flagsmith Admin API / Organization tokens are never exposed.
-4. **Minimal Secure Backend Proxy for Flagsmith Management API:**
-   Flagsmith Management APIs require administrative credentials (`Authorization: Api-Key <org_token>`). The backend provides a secure proxy endpoint (`/api/experiment-results`) that holds `FLAGSMITH_ADMIN_API_KEY` server-side, caches responses for 5 minutes, and safely returns experiment results to the client. If no admin key is configured or batch computation is running, it returns an honest waiting state without failing.
-5. **Accurate Tracking & Duplicate Prevention:**
+4. **Accurate Tracking & Duplicate Prevention:**
    * `application_started`: Fired once per application attempt. If a user closes and re-opens the form during the same attempt, no duplicate events are sent.
    * `application_completed`: Fired strictly after the application is saved and validated. Cancelled or failed attempts never trigger this event.
 6. **Mobile Responsiveness Across All Viewports:**
@@ -126,7 +117,7 @@ npm install
 ### 2. Configure Environment
 Ensure `frontend/.env.local` contains your Flagsmith Environment Key:
 ```env
-VITE_FLAGSMITH_ENVIRONMENT_KEY=
+VITE_FLAGSMITH_ENVIRONMENT_KEY=YOUR_CLIENT_SIDE_KEY
 ```
 
 ### 3. Start Development Server
