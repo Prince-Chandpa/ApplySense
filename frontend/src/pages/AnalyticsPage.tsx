@@ -652,7 +652,7 @@ export const AnalyticsPage: React.FC = () => {
               </div>
               <div className="detail-box">
                 <span className="detail-title">Environment Client Key</span>
-                <code>8ZJ6...4ZE (Masked)</code>
+                <code>*......*** (Masked)</code>
               </div>
               <div className="detail-box">
                 <span className="detail-title">Data Warehouse Connection</span>
@@ -661,7 +661,7 @@ export const AnalyticsPage: React.FC = () => {
             </div>
 
             {/* Live API Results Box */}
-            <div className="api-result-box">
+            {/* <div className="api-result-box">
               <div className="api-box-header">
                 <h4>Flagsmith Experiment Results Status</h4>
                 <span className="api-timestamp">
@@ -715,7 +715,7 @@ export const AnalyticsPage: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Architecture Explanation Card */}
             <div className="security-architecture-card">
